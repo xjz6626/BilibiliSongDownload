@@ -1,0 +1,26 @@
+# User configuration
+sync-nusic.fish
+_getlist.py
+
+# Data & Logs
+Music_Done/
+all_songs.txt
+archive.txt
+final_execution_log.txt
+preview_report.txt
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Media files (just in case)
+*.m4a
+*.mp4
+*.jpg
+*.png
+*.webp
+*.txt
+
+# System
+.DS_Store

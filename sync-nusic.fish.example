@@ -1,0 +1,75 @@
+#!/usr/bin/env fish
+
+# ================= 配置区域 =================
+# 1. 本地处理后的音乐文件夹
+set MUSIC_DIR "Music_Done"
+
+# 2. 下载记录文件 (防重复下载)
+set ARCHIVE_FILE "archive.txt"
+
+# 3. 浏览器 Cookies 来源 (chrome, edge, firefox 等)
+# 请修改为你实际使用的浏览器
+set COOKIES_BROWSER "chrome"
+
+# 4. 🔥 你的手机存储路径
+# 请修改为你手机上的实际路径
+set REMOTE_PATH "/sdcard/Music/Bilibili/"
+
+# 5. B站稍后播放地址 (使用标准短链接，更稳定)
+set WATCH_LATER_URL "https://www.bilibili.com/watchlater/#/list"
+# ===========================================
+
+# 🔥 新增：清空 Music_Done 文件夹，确保只处理新下载的歌曲
+if test -d "$MUSIC_DIR"
+    echo "🗑️  [0/4] 清空 $MUSIC_DIR 文件夹..."
+    # 使用 rm -rf 删除文件夹内的所有内容，但保留文件夹本身
+    rm -rf "$MUSIC_DIR"/*
+else
+    mkdir -p "$MUSIC_DIR"
+end
+
+echo "========================================"
+echo "🚀 B站稍后播放 -> 自动清洗 -> 手机同步"
+echo "========================================"
+
+# --- 步骤 1: 检查 ADB 连接 ---
+echo "🔌 [1/4] 检查手机连接..."
+set devices (adb devices | grep "device\$")
+if test -z "$devices"
+    echo "❌ 未检测到手机！请插上数据线并确保已开启 USB 调试。"
+    exit 1
+else
+    echo "✅ 手机已连接。"
+end
+
+# --- 步骤 2: 下载音频 (yt-dlp) ---
+echo "📥 [2/4] 从「稍后播放」下载新歌..."
+
+# 注意：这里只下载图片(--write-thumbnail)，不嵌入(--embed-thumbnail)
+# 因为嵌入工作交给 Python 脚本来做，防止封面冲突
+yt-dlp --cookies-from-browser $COOKIES_BROWSER \
+    $WATCH_LATER_URL \
+    -f 'ba/b' -x --audio-format m4a \
+    --output "$MUSIC_DIR/%(title)s.%(ext)s" \
+    --write-thumbnail --no-keep-video \
+    --download-archive $ARCHIVE_FILE \
+    --ignore-errors
+
+if test $status -ne 0
+    echo "⚠️ 下载过程有部分警告（可能是某些视频失效），继续尝试清洗..."
+end
+
+# --- 步骤 3: 运行 Python 强力清洗 ---
+echo "🧹 [3/4] 调用 Python 脚本 (清洗文件名 + 拆分歌手 + 统一专辑 + 嵌封面)..."
+python prv.py
+
+# --- 步骤 4: ADB 同步 ---
+echo "📲 [4/4] 推送到手机 (覆盖模式)..."
+# -p 显示进度条
+adb push -p $MUSIC_DIR/. "$REMOTE_PATH"
+
+echo "========================================"
+echo "🎉 全部完成！"
+echo "👉 1. 请拔掉数据线。"
+echo "👉 2. 打开手机 Musicolet -> 点击「扫描」刷新媒体库。"
+echo "========================================"

@@ -1,0 +1,83 @@
+import requests
+import time
+import math
+
+# ================= 配置區域 =================
+# 1. 把你在瀏覽器裡複製的 SESSDATA 填在這裡 (保留引號)
+# 如何获取: 浏览器 F12 -> Application -> Cookies -> SESSDATA
+SESSDATA = "YOUR_SESSDATA_HERE" 
+
+# 2. 你的收藏夾 ID
+# 如何获取: 打开收藏夹页面，URL 中的 fid 参数，或者 mlid
+MEDIA_ID = "YOUR_MEDIA_ID_HERE"
+# ===========================================
+
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "Cookie": f"SESSDATA={SESSDATA}"
+}
+
+def fetch_fav_list():
+    url = "https://api.bilibili.com/x/v3/fav/resource/list"
+    all_bvids = []
+    page = 1
+    page_size = 20
+    
+    print("🚀 開始抓取收藏夾列表...")
+
+    while True:
+        params = {
+            "media_id": MEDIA_ID,
+            "pn": page,
+            "ps": page_size,
+            "order": "mtime", # 按收藏時間排序
+            "type": 0,
+            "tid": 0,
+            "platform": "web"
+        }
+
+        try:
+            resp = requests.get(url, params=params, headers=headers)
+            data = resp.json()
+            
+            if data['code'] != 0:
+                print(f"❌ 錯誤: {data['message']}")
+                break
+                
+            medias = data['data']['medias']
+            
+            # 如果這一頁是空的，說明抓完了
+            if not medias:
+                print("✅ 抓取完畢！")
+                break
+            
+            for item in medias:
+                title = item['title']
+                bvid = item['bvid']
+                all_bvids.append(f"https://www.bilibili.com/video/{bvid}")
+            
+            print(f"📄 第 {page} 頁抓取成功 (本頁 {len(medias)} 個)...")
+            
+            # 如果獲取數量小於 page_size，說明是最後一頁
+            if len(medias) < page_size:
+                print("✅ 已到達最後一頁。")
+                break
+
+            page += 1
+            # 關鍵：延遲 0.5 秒，防止被 412
+            time.sleep(0.5)
+            
+        except Exception as e:
+            print(f"❌ 發生異常: {e}")
+            break
+
+    # 保存到文件
+    if all_bvids:
+        with open("all_songs.txt", "w", encoding="utf-8") as f:
+            f.write("\n".join(all_bvids))
+        print(f"\n🎉 成功！已保存 {len(all_bvids)} 個鏈接到 all_songs.txt")
+    else:
+        print("⚠️ 未獲取到任何視頻，請檢查 SESSDATA 是否正確。")
+
+if __name__ == "__main__":
+    fetch_fav_list()
