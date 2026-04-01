@@ -8,6 +8,7 @@ all_songs.txt
 archive.txt
 final_execution_log.txt
 preview_report.txt
+rerun_archive_50_test.py
 *.log
 
 # Python

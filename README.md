@@ -20,7 +20,7 @@
 *   **OS**: Linux / macOS (Windows 用户需使用 WSL 或自行修改 shell 脚本)
 *   **Shell**: Fish Shell (`sync-nusic.fish`)
 *   **Python**: Python 3.x
-    *   依赖库: `mutagen` (用于处理音频标签)
+    *   依赖库: `mutagen`、`openai`、`httpx`
 *   **工具**:
     *   `yt-dlp`: 强大的视频/音频下载工具。
     *   `adb`: Android Debug Bridge，用于传输文件到手机。
@@ -35,7 +35,7 @@
 sudo apt install fish python3 python3-pip adb ffmpeg
 
 # 安装 Python 依赖
-pip3 install mutagen
+pip3 install mutagen openai httpx
 
 # 安装 yt-dlp (推荐使用最新版)
 sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
@@ -48,6 +48,7 @@ sudo chmod a+rx /usr/local/bin/yt-dlp
     *   `COOKIES_BROWSER`: 设置为你使用的浏览器 (如 `chrome`, `edge`, `firefox`)，用于提取 B站 Cookies。
     *   `REMOTE_PATH`: 修改为你手机上的音乐存储路径 (例如 `/sdcard/Music/Bilibili/`)。
     *   `WATCH_LATER_URL`: 默认为 B站稍后播放列表，也可以改为其他收藏夹链接。
+    *   `SILICONFLOW_API_KEY`: 填入你的硅基流动 API Key（`prv.py` 会从环境变量读取，不再在代码中硬编码）。
 
 2.  **准备 B站列表**:
     *   在浏览器登录 B站。

@@ -17,6 +17,10 @@ set REMOTE_PATH "/sdcard/Music/Bilibili/"
 
 # 5. B站稍后播放地址 (使用标准短链接，更稳定)
 set WATCH_LATER_URL "https://www.bilibili.com/watchlater/#/list"
+
+# 6. 硅基流动 API Key (供 prv.py 读取)
+# 请修改为你自己的 Key
+set -gx SILICONFLOW_API_KEY "your_siliconflow_api_key_here"
 # ===========================================
 
 # 🔥 新增：清空 Music_Done 文件夹，确保只处理新下载的歌曲
