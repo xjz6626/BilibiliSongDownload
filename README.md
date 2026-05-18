@@ -48,7 +48,9 @@ sudo chmod a+rx /usr/local/bin/yt-dlp
     *   `COOKIES_BROWSER`: 设置为你使用的浏览器 (如 `chrome`, `edge`, `firefox`)，用于提取 B站 Cookies。
     *   `REMOTE_PATH`: 修改为你手机上的音乐存储路径 (例如 `/sdcard/Music/Bilibili/`)。
     *   `WATCH_LATER_URL`: 默认为 B站稍后播放列表，也可以改为其他收藏夹链接。
-    *   `SILICONFLOW_API_KEY`: 填入你的硅基流动 API Key（`prv.py` 会从环境变量读取，不再在代码中硬编码）。
+    *   `DEEPSEEK_API_KEY`: 你的 DeepSeek API Key（`prv.py` 从环境变量读取，不硬编码）。
+    *   `DEEPSEEK_BASE_URL`: 默认 `https://api.deepseek.com`；如走 Anthropic 兼容可改为 `https://api.deepseek.com/anthropic`。
+    *   `DEEPSEEK_MODEL`: 默认 `deepseek-v4-flash`，也可切到 `deepseek-v4-pro` / `deepseek-chat` / `deepseek-reasoner`。
 
 2.  **准备 B站列表**:
     *   在浏览器登录 B站。

@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import httpx  # 🔥 新增：用于接管底层网络请求
 from mutagen.mp4 import MP4, MP4Cover
 from openai import OpenAI
@@ -12,13 +13,16 @@ REPORT_FILE = "final_execution_log.txt"
 TARGET_ALBUM = "b站收藏"
 TARGET_ALBUM_ARTIST = "b站收藏"
 
-# API 配置 (从环境变量读取，避免硬编码)
-API_KEY = os.getenv("SILICONFLOW_API_KEY", "").strip()
-BASE_URL = "https://api.siliconflow.cn/v1"
+# API 配置（DeepSeek 默认，可通过环境变量覆盖）
+API_KEY = os.getenv("DEEPSEEK_API_KEY", os.getenv("LLM_API_KEY", "")).strip()
+BASE_URL = os.getenv("DEEPSEEK_BASE_URL", os.getenv("LLM_BASE_URL", "https://api.deepseek.com")).strip()
+MODEL_NAME = os.getenv("DEEPSEEK_MODEL", os.getenv("LLM_MODEL", "deepseek-v4-flash")).strip()
+REQUEST_TIMEOUT = float(os.getenv("LLM_TIMEOUT_SECONDS", "45"))
+MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "3"))
 # =========================================
 
 if not API_KEY:
-    raise RuntimeError("未检测到 SILICONFLOW_API_KEY，请先在 shell 中导出后再运行脚本。")
+    raise RuntimeError("未检测到 DEEPSEEK_API_KEY（或 LLM_API_KEY），请先在 shell 中导出后再运行脚本。")
 
 # 🔥 核心修复：强制忽略系统 SOCKS/HTTP 代理，直连国内 API
 http_client = httpx.Client(proxy=None, trust_env=False)
@@ -75,7 +79,7 @@ def scan_artists(text):
     return found
 
 def clean_title_with_ai(filename):
-    """调用 Qwen3-8B 清洗歌名，并彻底粉碎残余的 think 标签"""
+    """调用可配置模型清洗歌名，并彻底粉碎残余的 think 标签"""
     prompt = f"""
 你是一个无情的文本提取器。请从下面的原始音频文件名中，剥离出最纯净的核心【歌曲名】。
 
@@ -87,26 +91,34 @@ def clean_title_with_ai(filename):
 
 原始文件名："{filename}"
 """
-    try:
-        response = client.chat.completions.create(
-            model="Qwen/Qwen3-8B", 
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            extra_body={"enable_thinking": False}
-        )
-        clean_title = response.choices[0].message.content.strip()
-        
-        # 🔥 新增兜底逻辑：暴力清除大模型可能漏出的 think 标签
-        clean_title = re.sub(r'<think>.*?</think>', '', clean_title, flags=re.DOTALL) # 清除完整标签
-        clean_title = re.sub(r'</?think>', '', clean_title) # 清除残缺标签
-        clean_title = re.sub(r'\n+', '', clean_title) # 移除所有换行符（修复"吉\n\n哀歌"断层）
-        
-        # 兜底清理首尾残留的符号
-        clean_title = re.sub(r'^["\'《「]+|["\'》」]+$', '', clean_title).strip()
-        return clean_title
-    except Exception as e:
-        print(f"⚠️ API 请求失败，退回原名: {e}")
-        return filename
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            response = client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                timeout=REQUEST_TIMEOUT,
+            )
+            clean_title = response.choices[0].message.content.strip()
+
+            # 🔥 新增兜底逻辑：暴力清除大模型可能漏出的 think 标签
+            clean_title = re.sub(r'<think>.*?</think>', '', clean_title, flags=re.DOTALL) # 清除完整标签
+            clean_title = re.sub(r'</?think>', '', clean_title) # 清除残缺标签
+            clean_title = re.sub(r'\n+', '', clean_title) # 移除所有换行符（修复"吉\n\n哀歌"断层）
+
+            # 兜底清理首尾残留的符号
+            clean_title = re.sub(r'^["\'《「]+|["\'》」]+$', '', clean_title).strip()
+            return clean_title
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            if attempt < MAX_RETRIES:
+                wait_seconds = attempt * 2
+                print(f"⚠️ API 请求失败(第 {attempt}/{MAX_RETRIES} 次): {e}，{wait_seconds}s 后重试...")
+                time.sleep(wait_seconds)
+            else:
+                print(f"⚠️ API 请求失败，已重试 {MAX_RETRIES} 次，退回原名: {e}")
+                return filename
 
 def parse_file_info_hybrid(filename):
     """双引擎解析文件名"""
@@ -137,6 +149,19 @@ def find_cover(base_path, base_name):
             return cover_path
     return None
 
+def already_processed(file_path):
+    """检测文件是否已完成统一标签写入，用于中断后续跑"""
+    try:
+        audio = MP4(file_path)
+    except Exception:
+        return False
+
+    tags = audio.tags or {}
+    title = tags.get('\xa9nam')
+    album = tags.get('\xa9alb')
+    album_artist = tags.get('aART')
+    return bool(title) and album == [TARGET_ALBUM] and album_artist == [TARGET_ALBUM_ARTIST]
+
 def main():
     if not os.path.exists(MUSIC_DIR):
         print(f"❌ 找不到目录: {MUSIC_DIR}")
@@ -147,12 +172,17 @@ def main():
     files.sort()
     total = len(files)
     processed = 0
+    skipped = 0
     
     with open(REPORT_FILE, "w", encoding="utf-8") as log:
         for filename in files:
-            artist_list, artist_str, title, new_filename = parse_file_info_hybrid(filename)
-            
             file_path = os.path.join(MUSIC_DIR, filename)
+            if already_processed(file_path):
+                skipped += 1
+                print(f"⏭️ 跳过(已处理): {filename}")
+                continue
+
+            artist_list, artist_str, title, new_filename = parse_file_info_hybrid(filename)
             new_path = os.path.join(MUSIC_DIR, new_filename)
             
             try:
@@ -205,7 +235,7 @@ def main():
                 print(err_msg)
                 log.write(err_msg + "\n")
 
-    print(f"\n🎉 大功告成！共处理 {processed} 个文件。")
+    print(f"\n🎉 大功告成！共处理 {processed} 个文件，跳过 {skipped} 个已处理文件。")
     print(f"📁 详细日志已保存至 {REPORT_FILE}")
     print("📱 标签规范完毕，请使用 ADB 将 Music_Done 文件夹覆盖至手机测试效果！")
 
