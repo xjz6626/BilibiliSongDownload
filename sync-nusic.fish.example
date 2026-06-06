@@ -15,8 +15,9 @@ set COOKIES_BROWSER "chrome"
 # 请修改为你手机上的实际路径
 set REMOTE_PATH "/sdcard/Music/Bilibili/"
 
-# 5. B站稍后播放地址 (使用标准短链接，更稳定)
-set WATCH_LATER_URL "https://www.bilibili.com/watchlater/#/list"
+# 5. B站收藏夹地址：只检查前 50 个视频，archive.txt 负责跳过已下载记录
+set DOWNLOAD_URL "https://space.bilibili.com/98752587/favlist?fid=110008587&type=create"
+set PLAYLIST_ITEMS "1:50"
 
 # 6. DeepSeek 配置 (供 prv.py 读取)
 # OpenAI 兼容地址: https://api.deepseek.com
@@ -36,7 +37,7 @@ else
 end
 
 echo "========================================"
-echo "🚀 B站稍后播放 -> 自动清洗 -> 手机同步"
+echo "🚀 B站收藏夹前 50 个 -> 自动清洗 -> 手机同步"
 echo "========================================"
 
 # --- 步骤 1: 检查 ADB 连接 ---
@@ -50,12 +51,13 @@ else
 end
 
 # --- 步骤 2: 下载音频 (yt-dlp) ---
-echo "📥 [2/4] 从「稍后播放」下载新歌..."
+echo "📥 [2/4] 从收藏夹前 50 个视频中下载新歌..."
 
 # 注意：这里只下载图片(--write-thumbnail)，不嵌入(--embed-thumbnail)
 # 因为嵌入工作交给 Python 脚本来做，防止封面冲突
 yt-dlp --cookies-from-browser $COOKIES_BROWSER \
-    $WATCH_LATER_URL \
+    $DOWNLOAD_URL \
+    --playlist-items $PLAYLIST_ITEMS \
     -f 'ba/b' -x --audio-format m4a \
     --output "$MUSIC_DIR/%(title)s.%(ext)s" \
     --write-thumbnail --no-keep-video \
