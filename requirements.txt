@@ -1,0 +1,4 @@
+mutagen>=1.47,<2
+openai>=2,<3
+httpx>=0.28,<1
+requests>=2.32,<3
