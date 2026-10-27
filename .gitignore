@@ -4,6 +4,7 @@ _getlist.py
 
 # Data & Logs
 Music_Done/
+.migration/
 all_songs.txt
 archive.txt
 final_execution_log.txt
@@ -22,6 +23,7 @@ __pycache__/
 *.png
 *.webp
 *.txt
+!requirements.txt
 
 # System
 .DS_Store
